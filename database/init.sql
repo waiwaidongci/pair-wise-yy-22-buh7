@@ -29,8 +29,34 @@ CREATE TABLE IF NOT EXISTS restoration_plan (
   method TEXT,
   risk_assessment TEXT,
   approval_status TEXT,
-  owner_id TEXT
+  owner_id TEXT,
+  -- 送审时冻结的审批依据（文物状态/病害分级/送审时间，JSON）
+  approval_basis TEXT,
+  -- 送审后逐项标出的依据变化（JSON 数组）
+  basis_changes TEXT DEFAULT '[]',
+  -- 方案内容版本，内容修改即递增
+  content_version INTEGER DEFAULT 0,
+  -- 已收集意见对应的内容版本
+  votes_content_version INTEGER DEFAULT 0,
+  -- 待审意见清空原因：BASIS_CHANGED / CONTENT_CHANGED
+  opinions_reset_reason TEXT,
+  -- 送审依据要求的同意专家人数（脆弱/封存为 2）
+  required_approvals INTEGER DEFAULT 1,
+  decided_at TEXT
 );
+
+-- 专家审批意见：脆弱/封存文物需两名不同专家各一行 APPROVED
+CREATE TABLE IF NOT EXISTS plan_approval_vote (
+  id SERIAL PRIMARY KEY,
+  plan_id INTEGER NOT NULL,
+  expert_id INTEGER NOT NULL,
+  expert_name TEXT,
+  decision TEXT NOT NULL,
+  comment TEXT,
+  decided_at TEXT,
+  UNIQUE (plan_id, expert_id)
+);
+CREATE INDEX IF NOT EXISTS idx_plan_approval_vote_plan ON plan_approval_vote(plan_id);
 
 CREATE TABLE IF NOT EXISTS restoration_step (
   id INTEGER PRIMARY KEY,
@@ -60,5 +86,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
   action TEXT,
   target_type TEXT,
   target_id TEXT,
+  detail TEXT,
   created_at TEXT
 );

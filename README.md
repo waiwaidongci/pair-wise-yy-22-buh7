@@ -57,6 +57,20 @@ backend/src/routes, controllers, services, models, repositories, middlewares, co
 - RelicCondition: constants/RelicCondition、types/RelicCondition、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
 - PlanApprovalStatus: constants/PlanApprovalStatus、types/PlanApprovalStatus、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
 - DamageSeverity: constants/DamageSeverity、types/DamageSeverity、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
+- 审批把关常量（新增）：
+  - `ApprovalPolicy`（前后端 `constants/ApprovalPolicy.*`）：`DUAL_APPROVAL_CONDITIONS` 定义脆弱（FRAGILE）/封存（SEALED）文物须两名不同专家分别同意，`requiredApprovalsForCondition` 计算门槛。
+  - `approvalText`（前端 `constants/approvalText.ts`）：依据字段中文名、意见清空原因、同意/驳回文案。
+  - 依据字段枚举 `RELIC_CONDITION / DAMAGE_SEVERITY`：见 `types/RestorationPlan` 的 `BasisChange.field`、后端 `utils/approvalPolicy`、前端 `utils/approvalPolicy`、`BasisChangeTags`、审批日志模板。
+  - 审批错误码 `PLAN_NOT_FOUND / PLAN_NOT_SUBMITTED / BASIS_STALE / EXPERT_DUPLICATE / APPROVAL_THRESHOLD`：前后端 `constants/errorCodes` 与 `constants/errorMessages`。
+  - 审批日志模板 `PlanApproval`：前后端 `constants/logTemplates`（送审/表决/依据变化/内容变化/重新送审/决定）。
+
+## 方案审批如何盯住文物当前情况
+
+- **送审冻结依据**：`POST /api/restoration-plan/:id/submit` 时把当时的文物状态、病害等级、送审时间写入 `approval_basis`，专家看到的永远是这版快照；同时清空旧意见并按快照状态计算 `required_approvals`（脆弱/封存为 2）。
+- **任一依据变化即清空待审意见**：馆员经 `PATCH /api/relic-item/:id` 改状态或 `PATCH /api/damage-record/:id` 改分级时，服务层调用 `reconcileBasis`，把在审方案的待审意见清空、在 `basis_changes` 中逐项标出“文物状态/病害等级：旧值 → 新值”，并写审计日志。依据失效期间专家投票返回 `409 BASIS_STALE`，只能重新送审。
+- **脆弱/封存双审**：同一方案同一版本每名专家只能投一次票（`EXPERT_DUPLICATE`），须两名不同专家都同意才通过；驳回一票即驳回。
+- **方案内容修改重新收集意见**：`PUT /api/restoration-plan/:id/content` 修改标题/方法/风险评估时递增 `content_version`；在审方案立即清空意见并标注 `CONTENT_CHANGED`，已决方案退回草稿需重新送审。
+- **审批记录可追溯**：`ApprovalTimeline` 展示送审快照、变更项、每位专家的意见与时间、已同意人数/还差几人、决定时间；`BasisSnapshotCard` 与 `BasisChangeTags` 在方案页、工作台共用。
 
 ## 为什么会牵一发动全身
 

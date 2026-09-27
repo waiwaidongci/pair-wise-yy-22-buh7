@@ -1,1 +1,9 @@
-import { seed } from "../seed"; export const restorationStepRepository = { findAll: () => seed.restorationStep, save: (row: unknown) => row };
+import { dataStore } from "./dataStore";
+
+export const restorationStepRepository = {
+  findAll: () => dataStore.restorationStep,
+  save: (row: unknown) => {
+    dataStore.restorationStep.push(row as never);
+    return row;
+  }
+};
