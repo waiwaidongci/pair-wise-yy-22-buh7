@@ -57,6 +57,20 @@ backend/src/routes, controllers, services, models, repositories, middlewares, co
 - RelicCondition: constants/RelicCondition、types/RelicCondition、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
 - PlanApprovalStatus: constants/PlanApprovalStatus、types/PlanApprovalStatus、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
 - DamageSeverity: constants/DamageSeverity、types/DamageSeverity、constructors、logTemplates、errorMessages、筛选器、展示组件/控制器均有引用。
+- PlanBasisChangeType（RELIC_CONDITION / DAMAGE_SEVERITY / CONTENT，送审依据变化项）:
+  - 后端：`backend/src/constants/PlanApprovalStatus.ts`、`models/RestorationPlan.ts`、`models/PlanApprovalOpinion.ts`、`services/planApprovalPolicy.ts`、`services/RestorationPlanService.ts`、`repositories/PlanApprovalOpinionRepository.ts`、`utils/formatters`（前端同名）、审批日志模板 `constants/logTemplates.ts`。
+  - 前端：`constants/PlanApprovalStatus.ts`、`types/PlanApprovalStatus.ts`、`types/RestorationPlan.ts`、`utils/planApprovalPolicy.ts`、`utils/formatters.ts`、`mocks/mockApprovalApi.ts`、`components/common/ApprovalTimeline.tsx`、`pages/RelicsPage.tsx`、`pages/DamagesPage.tsx`、`pages/DashboardPage.tsx`。
+
+## 方案审批的“依据守护”规则
+
+馆员可能在方案送审后改动文物状态或病害分级，为避免专家按旧依据通过方案，平台在前后端执行同一套规则：
+
+1. **送审固化依据**：方案送审（`POST /api/restoration-plan/:id/submit`）时记录当时的文物 `current_condition`、病害 `severity` 与内容版本 `content_version`。
+2. **任一项变化即清空待审意见**：馆员通过 `PATCH /api/relic-item/:id/condition` 或 `PATCH /api/damage-record/:id/severity` 改动后，该文物所有 `SUBMITTED` 方案立即被标记 `basis_stale=true`，差异写入 `basis_changes` 并标出是“文物状态”还是“病害分级”变化；当前版本未作废的专家意见全部作废（保留记录，标记作废原因），专家在重新送审前不能再出具意见。
+3. **脆弱/封存双专家**：送审时文物状态为 `FRAGILE` 或 `SEALED` 时 `required_approvals=2`，且必须是两名不同专家（同专家重复同意返回 `PLAN_DUPLICATE_EXPERT`）；其他状态 1 名即可。满足同意人数自动通过，任一有效驳回即驳回。
+4. **内容改版重新收集意见**：修复师通过 `PATCH /api/restoration-plan/:id/content` 修改标题/方法/风险评估后，`content_version+1`、方案回 `DRAFT`、旧版本意见全部以 `CONTENT` 原因作废；需重新送审（`POST /api/restoration-plan/:id/resubmit`）后重新收集意见。
+5. **审批记录可追溯**：方案详情返回 `{ plan, opinions, approval }`，其中包含送审依据快照、变化项（from→to）、每条意见（含已作废意见与作废原因、对应内容版本）、已同意专家 id 列表与“还差几名专家”。前端统一由 `ApprovalTimeline` 展示。
+6. **RBAC**：状态/分级维护需 `LIBRARIAN`，送审/改版/重新送审需 `RESTORER`，出具意见需 `EXPERT`（请求头 `x-role/x-user-id/x-user-name`，`ADMIN` 放行）。后端不可达时前端 `mocks/mockApprovalApi.ts` 会在会话内执行同一套规则。
 
 ## 为什么会牵一发动全身
 

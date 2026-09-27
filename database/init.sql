@@ -29,7 +29,35 @@ CREATE TABLE IF NOT EXISTS restoration_plan (
   method TEXT,
   risk_assessment TEXT,
   approval_status TEXT,
-  owner_id TEXT
+  owner_id TEXT,
+  basis_condition TEXT,
+  basis_severity TEXT,
+  content_version INTEGER DEFAULT 1,
+  required_approvals INTEGER DEFAULT 1,
+  basis_stale BOOLEAN DEFAULT FALSE,
+  submitted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS plan_basis_change (
+  id INTEGER PRIMARY KEY,
+  plan_id INTEGER,
+  change_type TEXT,
+  from_value TEXT,
+  to_value TEXT,
+  detected_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS plan_approval_opinion (
+  id INTEGER PRIMARY KEY,
+  plan_id INTEGER,
+  expert_id INTEGER,
+  expert_name TEXT,
+  decision TEXT,
+  comment TEXT,
+  content_version INTEGER DEFAULT 1,
+  voided BOOLEAN DEFAULT FALSE,
+  voided_change TEXT,
+  created_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS restoration_step (
